@@ -1,0 +1,36 @@
+# Generated files by Cargo
+/target/
+
+# Cargo package files
+**/*.rs.bk
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*~
+
+# Misc
+*.rs.bk
+*.log
+
+# If you are using rust-analyzer
+.rs-analyzer/
+
+# MacOS metadata
+.DS_Store
+
+# Windows metadata
+Thumbs.db
+
+# Backup files
+*~
+
+# Rust specific
+Cargo.lock
+
+# If you have generated bindings or code
+/bindings/
+
+# Extra
+NOTES.md
