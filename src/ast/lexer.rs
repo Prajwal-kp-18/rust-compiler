@@ -1,5 +1,5 @@
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TokenKind {
     Number(i64),
     Plus,
@@ -22,11 +22,11 @@ pub enum TokenKind {
     // Error,
 }  
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct TextSpan {
-    pub start: usize,
-    pub end: usize,
-    pub literal: String,
+    pub(crate) start: usize,
+    pub(crate) end: usize,
+    pub(crate) literal: String,
 }
 
 impl TextSpan {
@@ -39,10 +39,10 @@ impl TextSpan {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Token {
-     pub kind: TokenKind,
-     pub span: TextSpan,
+     pub(crate) kind: TokenKind,
+     pub(crate) span: TextSpan,
 } 
 
 impl Token {
