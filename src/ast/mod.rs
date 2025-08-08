@@ -1,5 +1,8 @@
 pub mod lexer;
 pub mod parser;
+pub mod evaluator;
+
+use crate::ast::lexer::Token;
 
 pub struct Ast {
     pub statements: Vec<ASTStatement>,
@@ -40,12 +43,28 @@ pub trait ASTVisitor {
     fn do_visit_expression(&mut self, expression: &ASTExpression) {
         match &expression.kind {
             ASTExpressionKind::Number(number) => self.visit_number(number),
+            // doubt just added below statement to remove error
+            ASTExpressionKind::Binary(expr) => {
+                self.visit_binary_expression(expr);
+            }
+            ASTExpressionKind::Paranthesized(paren_expr) => {
+                self.visit_parenthesized_expression(paren_expr);
+            }
         }
     }
     fn visit_expression(&mut self, expression: &ASTExpression){
         self.do_visit_expression(expression);
     }
-    fn visit_number(&self, number: &ASTNumberExpression);
+
+    fn visit_number(&mut self, number: &ASTNumberExpression);
+
+    fn visit_binary_expression(&mut self, expr: &ASTBinaryExpression){
+        self.do_visit_expression(&expr.left);
+        self.do_visit_expression(&expr.right);
+    }
+    fn visit_parenthesized_expression(&mut self, paren_expr: &ASTParanthesizedExpression) {
+        self.visit_expression(&paren_expr.expression);
+    }
 }
 
 pub struct ASTPrintor{
@@ -69,8 +88,24 @@ impl ASTVisitor for ASTPrintor {
         self.indent -=LEVEL_INDENT;
     }
 
-    fn visit_number(&self, number: &ASTNumberExpression) {
+    fn visit_number(&mut self, number: &ASTNumberExpression) {
         self.print_with_indent(&format!("Number: {}", number.number));
+    }
+
+    fn visit_binary_expression(&mut self, expr: &ASTBinaryExpression) {
+        self.print_with_indent("Binary Expression");
+        self.indent += LEVEL_INDENT;
+        self.print_with_indent(&format!("Operator: {:?}", expr.operator.kind));
+        self.visit_expression(&expr.left);
+        self.visit_expression(&expr.right);
+        self.indent -= LEVEL_INDENT;
+    }
+
+    fn visit_parenthesized_expression(&mut self, paren_expr: &ASTParanthesizedExpression) {
+        self.print_with_indent("Parenthesized Expression");
+        self.indent += LEVEL_INDENT;
+        self.visit_expression(&paren_expr.expression);
+        self.indent -= LEVEL_INDENT;
     }
 
 
@@ -102,11 +137,46 @@ impl ASTStatement {
 
 pub enum ASTExpressionKind {
     Number(ASTNumberExpression),
-        
+    Binary(ASTBinaryExpression),   
+    Paranthesized(ASTParanthesizedExpression),
 }
 
+pub struct ASTBinaryExpression {
+    left: Box<ASTExpression>,
+    operator: ASTBinaryOperator,
+    right: Box<ASTExpression>,
+}
+
+pub struct ASTBinaryOperator {
+    pub kind: ASTBinaryOperatorKind,
+    pub token: Token,
+}
+
+impl ASTBinaryOperator {
+    pub fn new(kind: ASTBinaryOperatorKind, token: Token) -> Self {
+        ASTBinaryOperator { kind, token }
+    }
+
+    pub fn precedence(&self) -> u8 {
+        match self.kind {
+            ASTBinaryOperatorKind::Plus | ASTBinaryOperatorKind::Minus => 1,
+            ASTBinaryOperatorKind::Multiply | ASTBinaryOperatorKind::Divide => 2,
+        }
+    }
+}
+#[derive(Debug)]
+pub enum ASTBinaryOperatorKind {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+}
 pub struct ASTNumberExpression {
     number: i64,
+}
+
+pub struct ASTParanthesizedExpression {
+    expression: Box<ASTExpression>,
 }
 pub struct ASTExpression {
     kind: ASTExpressionKind,
@@ -119,5 +189,13 @@ impl ASTExpression {
 
     pub fn number(number: i64) -> Self {
         ASTExpression::new(ASTExpressionKind::Number(ASTNumberExpression { number }))
+    }
+
+    pub fn binary(operator: ASTBinaryOperator, left: ASTExpression, right: ASTExpression) -> Self {
+        ASTExpression::new(ASTExpressionKind::Binary(ASTBinaryExpression { left: Box::new(left), operator, right: Box::new(right) }))
+    }
+
+    pub fn paranthesized(expression: ASTExpression) -> Self {
+        ASTExpression::new(ASTExpressionKind::Paranthesized(ASTParanthesizedExpression { expression: Box::new(expression) }))
     }
 }

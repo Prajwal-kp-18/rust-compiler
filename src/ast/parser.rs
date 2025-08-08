@@ -1,5 +1,6 @@
-use crate::ast::lexer::Lexer;
 use crate::ast::lexer::Token;
+use crate::ast::ASTBinaryOperator;
+use crate::ast::ASTBinaryOperatorKind;
 use crate::ast::{ASTStatement, ASTExpression};
 use crate::ast::lexer::TokenKind;
 pub struct Parser {
@@ -8,9 +9,11 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new() -> Self {
+    pub fn new(
+        tokens: Vec<Token>,
+    ) -> Self {
         Parser {
-            tokens: Vec::new(),
+            tokens: tokens.iter().filter(|token| token.kind != TokenKind::Whitespace).cloned().collect(),
             current: 0,
         }
     }
@@ -22,14 +25,7 @@ impl Parser {
         }
     }
 
-    pub fn from_input(input: &str) -> Self {
-        let mut lexer: Lexer = Lexer::new(input);
-        let mut tokens: Vec<Token> = Vec::new();
-        while let Some(token) = lexer.next_token() {
-            tokens.push(token);
-        }
-        Self { tokens, current: 0 }
-    }
+    
 
     pub fn next_statement(&mut self) -> Option<ASTStatement>{
         return self.parse_statement();
@@ -45,14 +41,56 @@ impl Parser {
     }
 
     pub fn parse_expression(&mut self) -> Option<ASTExpression> {
+        return self.parse_binary_expression(0);
+    }
+
+    pub fn parse_binary_expression(&mut self, precedence: u8) -> Option<ASTExpression> {
+        let mut left: ASTExpression = self.parse_primary_expression()?;
+
+        loop {
+            let operator = self.parse_binary_operator();
+            let operator_precedence = match operator.as_ref().map(|op| op.precedence()) {
+                Some(op_prec) => op_prec,
+                None => break,
+            };
+            if operator_precedence < precedence {
+                break;
+            }
+            self.consume(); // only consume if we have a valid operator
+            let right: ASTExpression = self.parse_binary_expression(operator_precedence)?;
+            left = ASTExpression::binary(operator.unwrap(), left, right);
+        }
+
+        return Some(left);
+    }
+
+    pub fn parse_primary_expression(&mut self) -> Option<ASTExpression> {
         let token: &Token = self.consume()?;
         match token.kind {
             TokenKind::Number(number) => {
-                // doubt number is i64
                 return Some(ASTExpression::number(number));
+            },
+            TokenKind::LeftParen => {
+                let expression: ASTExpression = self.parse_expression()?;
+                if self.consume()?.kind != TokenKind::RightParen {
+                    panic!("Expected right parenthesis");
+                }
+                return Some(ASTExpression::paranthesized(expression)    );
             },
             _ => None,
         }
+    }
+
+    pub fn parse_binary_operator(&mut self) -> Option<ASTBinaryOperator> {
+        let token: &Token = self.current()?;
+        let kind = match token.kind {
+            TokenKind::Plus => Some(ASTBinaryOperatorKind::Plus),
+            TokenKind::Minus => Some(ASTBinaryOperatorKind::Minus),
+            TokenKind::Asterisk => Some(ASTBinaryOperatorKind::Multiply),
+            TokenKind::Slash => Some(ASTBinaryOperatorKind::Divide),
+            _ => None,
+        };
+        return kind.map(|kind| ASTBinaryOperator::new(kind, token.clone()));
     }
 
     pub fn peek(&self, offset: isize) -> Option<&Token> {
